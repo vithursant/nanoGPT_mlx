@@ -52,7 +52,7 @@ config = {k: globals()[k] for k in config_keys} # will be useful for logging
 
 # Load vocab and dataset:
 # poor man's data loader
-data_dir = '/Users/vithursant/Documents/nanoGPT/data/openwebtext'
+data_dir = os.path.join('data', dataset)
 train_data = np.memmap(os.path.join(data_dir, 'train.bin'), dtype=np.uint16, mode='r')
 val_data = np.memmap(os.path.join(data_dir, 'val.bin'), dtype=np.uint16, mode='r')
 
