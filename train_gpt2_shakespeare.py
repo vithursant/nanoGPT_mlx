@@ -1,7 +1,7 @@
 # train a miniature character-level shakespeare model
 # good for debugging and playing on macbooks and such
-dataset = 'shakespeare_char'
-gradient_accumulation_steps = 16
+dataset = 'shakespeare'
+gradient_accumulation_steps = 1
 batch_size = 4
 block_size = 256 # context of up to 256 previous characters
 

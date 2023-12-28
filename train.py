@@ -11,7 +11,7 @@ from mlx.utils import tree_flatten, tree_map
 
 from model import GPTConfig, GPT
 from optimizer import AdamW
-
+from tboard_utils import init_tensorboard, get_tensorboard
 
 # model
 n_layer = 12
@@ -43,6 +43,7 @@ context_size = 1024
 eval_interval = 10
 log_interval = 10
 eval_only = False
+out_dir = 'gpt2_openwebtext_pretrain'
 
 # -----------------------------------------------------------------------------
 config_keys = [k for k,v in globals().items() if not k.startswith('_') and isinstance(v, (int, float, bool, str))]
@@ -56,6 +57,10 @@ data_dir = os.path.join('data', dataset)
 train_data = np.memmap(os.path.join(data_dir, 'train.bin'), dtype=np.uint16, mode='r')
 val_data = np.memmap(os.path.join(data_dir, 'val.bin'), dtype=np.uint16, mode='r')
 
+# initialize tboard logging:
+os.makedirs(out_dir, exist_ok=True)
+tboard_dir = os.path.join(out_dir, "tboard_log")
+init_tensorboard(tboard_dir)
 
 def get_batch(split):
     data = train_data if split == 'train' else val_data
@@ -80,6 +85,12 @@ def print_loss(optimizer, iteration_count, average_loss, tic):
         f"lr {optimizer.learning_rate:.9f}"
     )
     return toc
+
+
+def log_tboard_dict(log_dict, itr, pre, post=''):
+    writer = get_tensorboard()
+    for k, v in log_dict.items():
+        writer.add_scalar(f'{pre}/{k}{post}', v, itr)
 
 
 def main():
@@ -184,6 +195,12 @@ def main():
             lambda x: mx.zeros_like(x), model.parameters()
         )
 
+        if iter_num % log_interval == 0:
+            log_train_dict = {
+                'loss': loss.item(),
+                'lr': new_lr
+            }
+            log_tboard_dict(log_train_dict, iter_num, 'train')
         iter_num += 1
         local_iter_num += 1
 
