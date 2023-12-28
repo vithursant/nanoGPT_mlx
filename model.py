@@ -53,6 +53,30 @@ class LayerNorm(nn.Module):
 class CausalSelfAttention(nn.Module):
 
     def __init__(self, config):
+        f"""
+        Initializes the Causal Self-Attention layer.
+
+        Args:
+            config (GPTConfig): An instance of the configuration class
+                specifying the hyperparameters for the Causal Self-Attention layer.
+
+        Attributes:
+            c_attn (nn.Linear): Linear layer for key, query, and value projections.
+            c_proj (nn.Linear): Linear layer for output projection.
+            attn_dropout (nn.Dropout): Dropout layer for attention weights.
+            resid_dropout (nn.Dropout): Dropout layer for residual connections.
+            n_head (int): Number of attention heads.
+            n_embd (int): Dimensionality of the embedding.
+            dropout (float): Dropout probability.
+
+        Notes:
+            - The configuration class should contain the necessary hyperparameters for
+              configuring the Causal Self-Attention layer.
+            - The `c_attn` layer combines key, query, and value projections in a batch.
+            - The `c_proj` layer handles the output projection.
+            - The `attn_dropout` and `resid_dropout` layers apply dropout regularization.
+            - The `n_head`, `n_embd`, and `dropout` attributes store hyperparameter values.
+        """
         super().__init__()
         assert config.n_embd % config.n_head == 0
         # key, query, value projections for all heads, but in a batch
@@ -93,9 +117,32 @@ class CausalSelfAttention(nn.Module):
     def create_additive_causal_mask(N: int, dtype: mx.Dtype = mx.float32):
         return mx.tril(mx.ones([N, N])).reshape(1, 1, N, N).astype(dtype)
 
+
 class MLP(nn.Module):
 
     def __init__(self, config):
+        f"""
+        Initializes the Multi-Layer Perceptron (MLP) layer.
+
+        Args:
+            config (GPTConfig): An instance of the configuration class
+                specifying the hyperparameters for the MLP layer.
+
+        Attributes:
+            c_fc (nn.Linear): Linear layer for fully connected transformations.
+            gelu (nn.GELU): GELU activation function.
+            c_proj (nn.Linear): Linear layer for output projection.
+            dropout (nn.Dropout): Dropout layer for regularization.
+
+        Notes:
+            - Ensure that the `config` parameter is an instance of `MLPConfig`.
+            - The configuration class should contain the necessary hyperparameters for
+              configuring the MLP layer.
+            - The `c_fc` layer performs a fully connected transformation.
+            - The `gelu` layer applies the GELU activation function.
+            - The `c_proj` layer handles the output projection.
+            - The `dropout` layer applies dropout regularization.
+        """
         super().__init__()
         self.c_fc    = nn.Linear(config.n_embd, 4 * config.n_embd, bias=config.bias)
         self.gelu    = nn.GELU()
@@ -109,9 +156,32 @@ class MLP(nn.Module):
         x = self.dropout(x)
         return x
 
+
 class Block(nn.Module):
 
     def __init__(self, config):
+        """
+        Initializes a block in a transformer architecture.
+
+        Args:
+            config (BlockConfig): An instance of the configuration class
+                specifying the hyperparameters for the block.
+
+        Attributes:
+            ln_1 (LayerNorm): Layer normalization for the first sub-block.
+            attn (CausalSelfAttention): Causal Self-Attention sub-block.
+            ln_2 (LayerNorm): Layer normalization for the second sub-block.
+            mlp (MLP): Multi-Layer Perceptron sub-block.
+
+        Notes:
+            - Ensure that the `config` parameter is an instance of `BlockConfig`.
+            - The configuration class should contain the necessary hyperparameters for
+              configuring the block.
+            - The `ln_1` layer performs layer normalization for the first sub-block.
+            - The `attn` layer represents the Causal Self-Attention sub-block.
+            - The `ln_2` layer performs layer normalization for the second sub-block.
+            - The `mlp` layer represents the Multi-Layer Perceptron sub-block.
+        """
         super().__init__()
         self.ln_1 = LayerNorm(config.n_embd, bias=config.bias)
         self.attn = CausalSelfAttention(config)
@@ -137,6 +207,19 @@ class GPTConfig:
 
 class GPT(nn.Module):
     def __init__(self, config):
+        """
+        Initializes a GPT (Generative Pre-trained Transformer) model.
+
+        Args:
+            config (GPTConfig): An instance of the configuration class
+                specifying the hyperparameters for the GPT model.
+
+        Attributes:
+            config (GPTConfig): Configuration instance containing model hyperparameters.
+            embedding (nn.Embedding): Embedding layer for input tokens.
+            transformer (List[Block]): List of transformer blocks.
+            out_proj (nn.Linear): Linear layer for output projection.
+        """
         super().__init__()
 
         assert config.vocab_size is not None

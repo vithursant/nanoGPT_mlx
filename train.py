@@ -12,8 +12,6 @@ from mlx.utils import tree_flatten, tree_map
 from model import GPTConfig, GPT
 from optimizer import AdamW
 
-import pdb
-
 
 # model
 n_layer = 12
@@ -90,7 +88,6 @@ def main():
                     bias=bias, vocab_size=None, dropout=dropout) # start with model_args from command line
 
     # Initialize model:
-    # model = TransformerLM(len(vocab), n_layer, n_embd, n_head)
     if meta_vocab_size is None:
         print("defaulting to vocab_size of GPT-2 to 50304 (50257 rounded up for efficiency)")
     model_args['vocab_size'] = meta_vocab_size if meta_vocab_size is not None else 50304
@@ -137,8 +134,7 @@ def main():
         if iter_num == 0 and eval_only:
             break
 
-        # optimizer = update_learning_rate(iter_num)
-        # pdb.set_trace()
+        # lr schedule
         if iter_num < warmup_iters:
             new_lr = max_lr * iter_num / warmup_iters
         elif iter_num > lr_decay_iters:
@@ -194,6 +190,7 @@ def main():
         # termination conditions
         if iter_num > max_iters:
             break
+
 
 if __name__ == "__main__":
     main()
