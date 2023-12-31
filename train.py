@@ -13,8 +13,6 @@ from model import GPTConfig, GPT
 from optimizer import AdamW
 from tboard_utils import init_tensorboard, get_tensorboard
 
-import pdb
-
 # model
 n_layer = 12
 n_head = 12
@@ -30,9 +28,6 @@ max_iters = num_iters
 warmup_pct = 0.1
 warmup_iters = 2000
 lr_decay_iters = 600000
-# warmup_iters = int(num_iters * warmup_pct)
-# lr_decay_iters = num_iters - warmup_iters
-# max_iters = warmup_iters + lr_decay_iters
 weight_decay = 1e-1
 beta1 = 0.9
 beta2 = 0.95

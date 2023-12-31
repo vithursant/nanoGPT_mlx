@@ -2,7 +2,7 @@
 
 A port of Andrej Karpathy's [nanoGPT](https://github.com/karpathy/nanoGPT) in Apple's new machine learning framework, [MLX](https://github.com/ml-explore/mlx).
 
-Train OpenAI's GPT-2 models or custom GPT-style models from scratch, all on your Mac GPU!
+Train OpenAI's GPT-2 models or custom GPT-style models from scratch, all on your Mac's GPU!
 
 Still under active development, but currently the file `train.py` closely resembles the nanoGPT codebase.
 
@@ -36,7 +36,7 @@ python data/shakespeare_char/prepare.py
 
 Now, let's train a "baby GPT" model on your MAC GPU:
 ```bash
-python train.py train_gpt2_shakespeare.py
+python train.py configs/train_gpt2_shakespeare.py
 ```
 
 On my Macbook M3 Pro, I am observing `~0.37 iterations/second` when training a `~45M parameter` GPT-2 model, at `batch_size=64` (i.e., `local_batch_size=4` and `gradient_accumulation=16`).
