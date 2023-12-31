@@ -11,6 +11,7 @@ learning_rate = 2e-3 # with baby networks can afford to go a bit higher
 min_lr = 2e-4
 num_iters = 5000
 warmup_iters = 100
+lr_decay_iters = 5000
 min_lr = 1e-4 # learning_rate / 10 usually
 beta2 = 0.99 # make a bit bigger because number of tokens per iter is small
 
@@ -24,4 +25,3 @@ dropout = 0.2
 eval_interval = 250 # keep frequent because we'll overfit
 eval_iters = 200
 log_interval = 10 # don't print too too often
-

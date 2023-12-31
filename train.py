@@ -24,7 +24,6 @@ bias = False # do we use bias inside LayerNorm and Linear layers?
 
 # adamw optimizer
 learning_rate = 2.6e-5 # max learning rate
-max_lr = learning_rate
 min_lr = 2.6e-6
 num_iters = 600000 # total number of training iterations
 max_iters = num_iters
@@ -96,7 +95,7 @@ def print_loss(optimizer, iteration_count, average_loss, tic):
 
 def update_learning_rate(it):
     if it < warmup_iters:
-        return max_lr * it / warmup_iters
+        return learning_rate * it / warmup_iters
     if it > lr_decay_iters:
         return min_lr
     decay_ratio = (it - warmup_iters) / (
@@ -104,7 +103,7 @@ def update_learning_rate(it):
     )
     assert 0 <= decay_ratio <= 1
     coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
-    new_lr = min_lr + coeff * (max_lr - min_lr)
+    new_lr = min_lr + coeff * (learning_rate - min_lr)
     return new_lr
     
 
@@ -145,7 +144,6 @@ def main():
     tic = time.perf_counter()
     local_iter_num = 0 # number of iterations in the lifetime of this process
     iter_num = 0
-
     while True:
         if iter_num == 0 and eval_only:
             break
@@ -202,7 +200,6 @@ def main():
         # termination conditions
         if iter_num > max_iters:
             break
-
 
 if __name__ == "__main__":
     main()
