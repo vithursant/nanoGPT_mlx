@@ -13,6 +13,8 @@ from model import GPTConfig, GPT
 from optimizer import AdamW
 from tboard_utils import init_tensorboard, get_tensorboard
 
+import pdb
+
 # model
 n_layer = 12
 n_head = 12
@@ -25,9 +27,13 @@ learning_rate = 2.6e-5 # max learning rate
 max_lr = learning_rate
 min_lr = 2.6e-6
 num_iters = 600000 # total number of training iterations
-warmup_iters = int(num_iters * 0.1)
-lr_decay_iters = num_iters - warmup_iters
-max_iters = warmup_iters + lr_decay_iters
+max_iters = num_iters
+warmup_pct = 0.1
+warmup_iters = 2000
+lr_decay_iters = 600000
+# warmup_iters = int(num_iters * warmup_pct)
+# lr_decay_iters = num_iters - warmup_iters
+# max_iters = warmup_iters + lr_decay_iters
 weight_decay = 1e-1
 beta1 = 0.9
 beta2 = 0.95
@@ -62,6 +68,7 @@ os.makedirs(out_dir, exist_ok=True)
 tboard_dir = os.path.join(out_dir, "tboard_log")
 init_tensorboard(tboard_dir)
 
+
 def get_batch(split):
     data = train_data if split == 'train' else val_data
     ix = np.random.randint(len(data) - context_size, size=(batch_size,))
@@ -87,6 +94,20 @@ def print_loss(optimizer, iteration_count, average_loss, tic):
     return toc
 
 
+def update_learning_rate(it):
+    if it < warmup_iters:
+        return max_lr * it / warmup_iters
+    if it > lr_decay_iters:
+        return min_lr
+    decay_ratio = (it - warmup_iters) / (
+        lr_decay_iters - warmup_iters
+    )
+    assert 0 <= decay_ratio <= 1
+    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
+    new_lr = min_lr + coeff * (max_lr - min_lr)
+    return new_lr
+    
+
 def log_tboard_dict(log_dict, itr, pre, post=''):
     writer = get_tensorboard()
     for k, v in log_dict.items():
@@ -98,7 +119,7 @@ def main():
     model_args = dict(n_layer=n_layer, n_head=n_head, n_embd=n_embd, block_size=context_size,
                     bias=bias, vocab_size=None, dropout=dropout) # start with model_args from command line
 
-    # Initialize model:
+    # initialize model:
     if meta_vocab_size is None:
         print("defaulting to vocab_size of GPT-2 to 50304 (50257 rounded up for efficiency)")
     model_args['vocab_size'] = meta_vocab_size if meta_vocab_size is not None else 50304
@@ -112,30 +133,14 @@ def main():
     )
     print(f"Training a transformer with {nparams / 1024**2:.3f} M parameters")
     
-    # TODO:
-    # # create optim groups. Any parameters that is 2D will be weight decayed, otherwise no.
-    # # i.e. all weight tensors in matmuls + embeddings decay, all biases and layernorms don't.
-    # param_dict = {}
-    # for k, x in tree_flatten(model.trainable_parameters()):
-    #     param_dict[k] = x
-    # decay_params = [p for n, p in param_dict.items() if len(p.shape) >= 2]
-    # nodecay_params = [p for n, p in param_dict.items() if len(p.shape) < 2]
-    # num_decay_params = sum(numel(p.shape) for p in decay_params)
-    # num_nodecay_params = sum(numel(p.shape) for p in nodecay_params)
-    # print(f"num decayed parameter tensors: {len(decay_params)}, with {num_decay_params:,} parameters")
-    # print(f"num non-decayed parameter tensors: {len(nodecay_params)}, with {num_nodecay_params:,} parameters")
-    # optim_groups = [
-    #     {'params': decay_params, 'weight_decay': weight_decay},
-    #     {'params': nodecay_params, 'weight_decay': 0.0}
-    # ]
-
+    # setup optimizer
     optimizer = AdamW(learning_rate=learning_rate, 
                             betas=[beta1, beta2], 
                             weight_decay=weight_decay)
     loss_and_grad_fn = nn.value_and_grad(model, model.loss)
 
-
-    X, Y = get_batch('train') # fetch the very first batch
+    # fetch the first batch of samples.
+    X, Y = get_batch('train')
     
     tic = time.perf_counter()
     local_iter_num = 0 # number of iterations in the lifetime of this process
@@ -146,20 +151,10 @@ def main():
             break
 
         # lr schedule
-        if iter_num < warmup_iters:
-            new_lr = max_lr * iter_num / warmup_iters
-        elif iter_num > lr_decay_iters:
-            new_lr = min_lr
-        else:
-            decay_ratio = (iter_num - warmup_iters) / (
-                lr_decay_iters - warmup_iters
-            )
-            assert 0 <= decay_ratio <= 1
-            coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
-            new_lr = min_lr + coeff * (max_lr - min_lr)
+        new_lr = update_learning_rate(iter_num)
         optimizer.set_learning_rate(new_lr)
 
-        # Gradient Accumulation
+        # gradient accumulation
         accumulated_grads = tree_map(
                     lambda x: mx.zeros_like(x), model.parameters()
                 )

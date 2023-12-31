@@ -5,6 +5,8 @@ import mlx.nn as nn
 
 from dataclasses import dataclass
 
+import pdb
+
 
 class LayerNorm(nn.Module):
     r"""Applies layer normalization [1] on the inputs.
@@ -91,7 +93,7 @@ class CausalSelfAttention(nn.Module):
         self.n_embd = config.n_embd
         self.dropout = config.dropout
 
-    def __call__(self, x, mask):
+    def __call__(self, x, mask, cache=None):
         B, T, C = x.shape # batch size, sequence length, embedding dimensionality (n_embd)
 
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
@@ -99,6 +101,11 @@ class CausalSelfAttention(nn.Module):
         key = key.reshape(B, T, self.n_head, C // self.n_head).transpose(0, 2, 1, 3) # (B, nh, T, hs)
         query = query.reshape(B, T, self.n_head, C // self.n_head).transpose(0, 2, 1, 3) # (B, nh, T, hs)
         value = value.reshape(B, T, self.n_head, C // self.n_head).transpose(0, 2, 1, 3) # (B, nh, T, hs)
+
+        if cache is not None:
+            key_cache, value_cache = cache
+            key = mx.concatenate([key_cache, key], axis=2)
+            value = mx.concatenate([value_cache, value], axis=2)
 
         # manual implementation of attention
         att = (query @ key.transpose(0, 1, 3, 2)) * (1.0 / math.sqrt(key.shape[3]))
@@ -111,7 +118,7 @@ class CausalSelfAttention(nn.Module):
 
         # output projection
         y = self.resid_dropout(self.c_proj(y))
-        return y
+        return y, (key, value)
 
     @staticmethod
     def create_additive_causal_mask(N: int, dtype: mx.Dtype = mx.float32):
@@ -188,10 +195,11 @@ class Block(nn.Module):
         self.ln_2 = LayerNorm(config.n_embd, bias=config.bias)
         self.mlp = MLP(config)
 
-    def __call__(self, x, mask):
-        x = x + self.attn(self.ln_1(x), mask)
+    def __call__(self, x, mask, cache=None):
+        att, cache = self.attn(self.ln_1(x), mask, cache)
+        x = x + att
         x = x + self.mlp(self.ln_2(x))
-        return x
+        return x, cache
 
 
 @dataclass
@@ -226,20 +234,70 @@ class GPT(nn.Module):
         assert config.block_size is not None
         self.config = config
 
-        self.embedding = nn.Embedding(config.vocab_size, config.n_embd)
+        self.wte = nn.Embedding(config.vocab_size, config.n_embd)
+        self.wpe = nn.Embedding(config.block_size, config.n_embd)
+        self.drop = nn.Dropout(config.dropout)
         self.transformer = [Block(config) for _ in range(config.n_layer)]
+        self.ln_f = nn.LayerNorm(config.n_embd, affine=config.bias)
         self.out_proj = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
+    def _sample_next_token(self, x, temperature):
+        logits = mx.expand_dims(x[:, -1], axis=0) @ self.wte.weight.T
+        y = logits[:, -1, :]
+        y = mx.random.categorical(y * (1 / temperature))
+        return y
+
+    def generate(self, x: mx.array, max_new_tokens=256, temperature=0.8):
+        _, t = x.shape
+        pos = mx.arange(0, t, 1, dtype=x.dtype)
+        mask = CausalSelfAttention.create_additive_causal_mask(t)
+        x, cache = self._forward_transformer(x, pos, mask=mask, build_cache=True)
+        y = self._sample_next_token(x, temperature)
+        position = t
+        yield y
+
+        for _ in range(max_new_tokens):
+            position += 1
+            x = y[:, None]
+            x, cache = self._forward_transformer(x, position, cache=cache)
+            y = self._sample_next_token(x, temperature)
+            yield y
+
+    def _forward_transformer(
+        self, x: mx.array, pos: mx.array, mask=None, cache=None, build_cache=False
+    ):
+        tok_emb = self.wte(x)
+        pos_emb = self.wpe(pos)
+        x = self.drop(tok_emb + pos_emb)
+        kv_cache = []
+
+        if cache is not None:
+            for i in range(len(cache)):
+                x, cache[i] = self.transformer[i](x, mask=None, cache=cache[i])
+        else:
+            for block in self.transformer:
+                x, curr_cache = block(x, mask=mask)
+                if build_cache:
+                    kv_cache.append(curr_cache)
+
+        x = self.ln_f(x)
+        return x, kv_cache if build_cache else cache
+
     def __call__(self, x):
+        b, t = x.shape
+        assert (
+            t <= self.config.block_size
+        ), f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
+        pos = mx.arange(0, t, 1, dtype=x.dtype)
         mask = CausalSelfAttention.create_additive_causal_mask(x.shape[1])
-        x = self.embedding(x)
-        for l in self.transformer:
-            x = l(x, mask)
+
+        x, _ = self._forward_transformer(x, pos, mask=mask)
         return self.out_proj(x)
 
     def loss(self, x, y, reduce=True):
         logits = self(x)
-        losses = nn.losses.cross_entropy(logits, y)
-        mx.simplify(losses)
-
-        return mx.mean(losses) if reduce else mx.mean(losses, axis=(-1, -2))
+        loss = nn.losses.cross_entropy(
+            logits.reshape(-1, logits.shape[-1]), y.reshape(-1)
+        )
+        mx.simplify(loss)
+        return mx.mean(loss)
