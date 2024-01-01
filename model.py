@@ -292,7 +292,7 @@ class GPT(nn.Module):
         x, _ = self._forward_transformer(x, pos, mask=mask)
         return self.out_proj(x)
 
-    def loss(self, x, y, reduce=True):
+    def loss(self, x, y):
         logits = self(x)
         loss = nn.losses.cross_entropy(
             logits.reshape(-1, logits.shape[-1]), y.reshape(-1)

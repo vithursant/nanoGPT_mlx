@@ -4,6 +4,7 @@ import time
 import numpy as np
 from typing import List
 
+import mlx
 import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
@@ -13,12 +14,15 @@ from model import GPTConfig, GPT
 from optimizer import AdamW
 from tboard_utils import init_tensorboard, get_tensorboard
 
+import pdb
+
 # model
 n_layer = 12
 n_head = 12
 n_embd = 768
 dropout = 0.0 # for pretraining 0 is good, for finetuning try 0.1+
 bias = False # do we use bias inside LayerNorm and Linear layers?
+d_type = 'float32'
 
 # adamw optimizer
 learning_rate = 2.6e-5 # max learning rate
@@ -119,6 +123,13 @@ def main():
     gptconf = GPTConfig(**model_args)
     model = GPT(gptconf)
     print(model)
+
+    if d_type in ['bfloat16', 'float16']:
+        print("BF16/FP16 is currently not supported. Defaulting to FP32.")
+        d_type = 'float32'
+
+    weights = tree_map(lambda p: p.astype(getattr(mx, d_type)), model.parameters())
+    model.update(weights)
 
     mx.eval(model.parameters())
     nparams = sum(
