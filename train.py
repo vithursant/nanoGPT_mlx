@@ -24,7 +24,6 @@ bias = False # do we use bias inside LayerNorm and Linear layers?
 learning_rate = 2.6e-5 # max learning rate
 min_lr = 2.6e-6
 num_iters = 600000 # total number of training iterations
-max_iters = num_iters
 warmup_pct = 0.1
 warmup_iters = 2000
 lr_decay_iters = 600000
@@ -193,7 +192,7 @@ def main():
         local_iter_num += 1
 
         # termination conditions
-        if iter_num > max_iters:
+        if iter_num > num_iters:
             break
 
 if __name__ == "__main__":

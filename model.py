@@ -5,8 +5,6 @@ import mlx.nn as nn
 
 from dataclasses import dataclass
 
-import pdb
-
 
 class LayerNorm(nn.Module):
     r"""Applies layer normalization [1] on the inputs.
@@ -301,3 +299,4 @@ class GPT(nn.Module):
         )
         mx.simplify(loss)
         return mx.mean(loss)
+        

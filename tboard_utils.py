@@ -42,3 +42,4 @@ def get_tensorboard() -> SummaryWriter:
         "a logdir to init_tensorboard() first."
     )
     return _TENSORBOARD_WRITER
+    

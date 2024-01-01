@@ -50,3 +50,4 @@ for arg in sys.argv[1:]:
             globals()[key] = attempt
         else:
             raise ValueError(f"Unknown config key: {key}")
+            
