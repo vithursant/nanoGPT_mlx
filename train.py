@@ -14,7 +14,6 @@ from model import GPTConfig, GPT
 from optimizer import AdamW
 from tboard_utils import init_tensorboard, get_tensorboard
 
-import pdb
 
 # model
 n_layer = 12
