@@ -6,8 +6,10 @@ batch_size = 1
 block_size = 1024
 gradient_accumulation_steps = 512
 
-# this makes total number of tokens be 300B
-num_iters = 4496
+# this makes total number of tokens be 2.47B following Chinchilla optimal scaling (20 tpp).
+num_iters = 4715
+lr_decay_iters = 4715
+warmup_iters = 471
 
 # eval stuff
 eval_interval = 250

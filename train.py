@@ -25,8 +25,8 @@ bias = False # do we use bias inside LayerNorm and Linear layers?
 d_type = 'float32'
 
 # adamw optimizer
-learning_rate = 2.6e-5 # max learning rate
-min_lr = 2.6e-6
+learning_rate = 6.0e-4 # max learning rate
+min_lr = 6.0e-5
 num_iters = 600000 # total number of training iterations
 warmup_pct = 0.1
 warmup_iters = 2000
@@ -74,13 +74,6 @@ def get_batch(split):
     return x, y
 
 
-def numel(sizes):
-    numel = 1
-    for elem in sizes:
-        numel *= elem
-    return numel
-
-
 def print_loss(optimizer, iteration_count, average_loss, tic):
     toc = time.perf_counter()
     print(
@@ -123,10 +116,6 @@ def main():
     gptconf = GPTConfig(**model_args)
     model = GPT(gptconf)
     print(model)
-
-    if d_type in ['bfloat16', 'float16']:
-        print("BF16/FP16 is currently not supported. Defaulting to FP32.")
-        d_type = 'float32'
 
     weights = tree_map(lambda p: p.astype(getattr(mx, d_type)), model.parameters())
     model.update(weights)

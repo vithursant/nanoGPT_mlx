@@ -43,6 +43,17 @@ On my Macbook M3 Pro, I am observing `~0.37 iterations/second` when training a `
 
 ![repro124m](assets/baby_gpt2_shakespeare_train_loss.png)
 
+## openwebtext
+To train a GPT-2 model on OpenWebText similar to nanoGPT, first prepare the dataset:
+```bash
+python data/openwebtext/prepare.py
+```
+
+Then, train a 124M GPT-2 model on your MAC GPU:
+```bash
+python train.py configs/train_gpt2_owt.py
+```
+
 ## todos
 - disable weight decay on non-decay params in optimizer
 - add bfloat16 training support
