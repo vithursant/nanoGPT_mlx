@@ -236,7 +236,7 @@ class GPT(nn.Module):
         self.wpe = nn.Embedding(config.block_size, config.n_embd)
         self.drop = nn.Dropout(config.dropout)
         self.transformer = [Block(config) for _ in range(config.n_layer)]
-        self.ln_f = nn.LayerNorm(config.n_embd, bias=config.bias)
+        self.ln_f = LayerNorm(config.n_embd, bias=config.bias)
         self.out_proj = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
     def _sample_next_token(self, x, temperature):
