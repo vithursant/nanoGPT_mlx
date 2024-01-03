@@ -31,7 +31,7 @@ Dependencies:
 ## quick start
 To train a character-level GPT, prepare shakespeare dataset similar to nanoGPT. This will create a `train.bin` and `val.bin` in that data directory.
 ```bash
-python data/shakespeare_char/prepare.py
+python data/shakespeare/prepare.py
 ```
 
 Now, let's train a "baby GPT" model on your MAC GPU:
