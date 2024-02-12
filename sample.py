@@ -20,12 +20,11 @@ max_new_tokens = 256 # number of tokens generated in each sample
 temperature = 0.8 # 1.0 = no change, < 1.0 = less random, > 1.0 = more random, in predictions
 top_k = 200 # retain only the top_k most likely tokens, clamp others to have 0 probability
 seed = 1337
-save_name = 'gpt2_small_owt'
 exec(open('configurator.py').read()) # overrides from command line or config file
 # -----------------------------------------------------------------------------
 
-model_weights_path = os.path.join(out_dir, save_name + '.npz')
-model_config_path = os.path.join(out_dir, save_name + '.json')
+model_weights_path = os.path.join(out_dir, out_dir + '.npz')
+model_config_path = os.path.join(out_dir, out_dir + '.json')
 
 # model
 if init_from == 'resume':

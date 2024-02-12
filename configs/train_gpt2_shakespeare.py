@@ -1,7 +1,6 @@
 # train a miniature character-level shakespeare model
 # good for debugging and playing on macbooks and such
 out_dir = 'gpt2_shakespeare_pretrain'
-save_name = 'gpt2_small_shakespeare'
 dataset = 'shakespeare'
 gradient_accumulation_steps = 16
 batch_size = 4

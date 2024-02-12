@@ -49,7 +49,6 @@ eval_interval = 10
 log_interval = 10
 eval_only = False
 out_dir = 'gpt2_openwebtext_pretrain'
-save_name = 'gpt2_small_owt'
 
 # -----------------------------------------------------------------------------
 config_keys = [k for k,v in globals().items() if not k.startswith('_') and isinstance(v, (int, float, bool, str))]
@@ -64,8 +63,8 @@ train_data = np.memmap(os.path.join(data_dir, 'train.bin'), dtype=np.uint16, mod
 val_data = np.memmap(os.path.join(data_dir, 'val.bin'), dtype=np.uint16, mode='r')
 
 # model save path
-save_model_path = os.path.join(out_dir, save_name + '.npz')
-save_model_config_path = os.path.join(out_dir, save_name + '.json')
+save_model_path = os.path.join(out_dir, out_dir + '.npz')
+save_model_config_path = os.path.join(out_dir, out_dir + '.json')
 
 # initialize tboard logging:
 os.makedirs(out_dir, exist_ok=True)
