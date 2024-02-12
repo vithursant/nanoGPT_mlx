@@ -363,3 +363,4 @@ def custom_slice(indices, start, end):
     # Take the range of indices from start to end
     sliced_indices = mx.take(indices, mx.arange(start, end))
     return sliced_indices
+    

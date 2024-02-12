@@ -9,10 +9,9 @@ from mlx.utils import tree_unflatten, tree_flatten
 
 from model import GPT, GPTConfig
 
-import pdb
 
 # -----------------------------------------------------------------------------
-init_from = 'resume' # either 'resume' (from an out_dir) or a gpt2 variant (e.g. 'gpt2-xl')
+init_from = 'gpt2' # either 'resume' (from an out_dir) or a gpt2 variant (e.g. 'gpt2-xl')
 out_dir = 'out' # ignored if init_from is not 'resume'
 start = "\n" # or "<|endoftext|>" or etc. Can also specify a file, use as: "FILE:prompt.txt"
 num_samples = 10 # number of samples to draw
@@ -44,7 +43,7 @@ if init_from == 'resume':
 
 elif init_from.startswith('gpt2'):
     # TODO
-    print("Only mlx pre-trained models supported currently.")
+    raise NotImplementedError("This feature/functionality is not yet implemented.")
 
 # ok let's assume gpt-2 encodings by default
 enc = tiktoken.get_encoding("gpt2")

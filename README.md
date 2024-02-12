@@ -63,7 +63,8 @@ python train.py configs/train_gpt2_owt.py
 - [ ] disable weight decay on non-decay params in optimizer
 - [ ] add bfloat16 training support
 - [ ] integrate Eleuther Eval
-- [x] add checkpoint conversion for loading pre-trained models 
+- [ ] add checkpoint conversion for loading pre-trained HF models 
+- [x] add saveing and loading pre-trained MLX models 
 - [ ] enable finetuning models from pre-trained checkpoints
 - [x] enable inference with pre-trained models
 
