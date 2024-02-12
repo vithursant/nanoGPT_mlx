@@ -1,6 +1,8 @@
 import os
 import math
 import time
+import json
+
 import numpy as np
 from typing import List
 
@@ -42,10 +44,12 @@ gradient_accumulation_steps = 512
 context_size = 1024
 
 # eval
+save_interval = 1
 eval_interval = 10
 log_interval = 10
 eval_only = False
 out_dir = 'gpt2_openwebtext_pretrain'
+save_name = 'gpt2_small_owt'
 
 # -----------------------------------------------------------------------------
 config_keys = [k for k,v in globals().items() if not k.startswith('_') and isinstance(v, (int, float, bool, str))]
@@ -58,6 +62,10 @@ config = {k: globals()[k] for k in config_keys} # will be useful for logging
 data_dir = os.path.join('data', dataset)
 train_data = np.memmap(os.path.join(data_dir, 'train.bin'), dtype=np.uint16, mode='r')
 val_data = np.memmap(os.path.join(data_dir, 'val.bin'), dtype=np.uint16, mode='r')
+
+# model save path
+save_model_path = os.path.join(out_dir, save_name + '.npz')
+save_model_config_path = os.path.join(out_dir, save_name + '.json')
 
 # initialize tboard logging:
 os.makedirs(out_dir, exist_ok=True)
@@ -78,7 +86,7 @@ def print_loss(optimizer, iteration_count, average_loss, tic):
     print(
         f"iter {iteration_count}: train loss {average_loss:.3f}, "
         f"it/sec {1.0 / (toc - tic):.3f}, "
-        f"lr {optimizer.learning_rate:.9f}"
+        f"lr {optimizer.learning_rate.item():.9f}"
     )
     return toc
 
@@ -124,34 +132,31 @@ def main():
         x.size for k, x in tree_flatten(model.parameters()) if "embedding" not in k
     )
     print(f"Training a transformer with {nparams / 1024**2:.3f} M parameters")
-    
+
+
+    def loss_fn(model, x, y, reduce=True):
+        logits = model(x)
+        losses = nn.losses.cross_entropy(
+            logits.reshape(-1, logits.shape[-1]), y.reshape(-1)
+        )
+        return mx.mean(losses) if reduce else mx.mean(losses, axis=(-1, -2))
+
+
     # setup optimizer
     optimizer = AdamW(learning_rate=learning_rate, 
                             betas=[beta1, beta2], 
                             weight_decay=weight_decay)
-    loss_and_grad_fn = nn.value_and_grad(model, model.loss)
+    loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
 
-    # fetch the first batch of samples.
-    X, Y = get_batch('train')
-    
-    tic = time.perf_counter()
-    local_iter_num = 0 # number of iterations in the lifetime of this process
-    iter_num = 0
-    while True:
-        if iter_num == 0 and eval_only:
-            break
 
-        # lr schedule
-        new_lr = update_learning_rate(iter_num)
-        optimizer.set_learning_rate(new_lr)
-
+    def step(inputs, targets, gradient_accumulation_steps):
         # gradient accumulation
         accumulated_grads = tree_map(
                     lambda x: mx.zeros_like(x), model.parameters()
                 )
         accumulated_loss = 0.0
         for micro_step in range(gradient_accumulation_steps):
-            loss, grads = loss_and_grad_fn(X, Y)
+            loss, grads = loss_and_grad_fn(model, X, Y)
 
             accumulated_grads = tree_map(
                 lambda acc, new: acc + new * (1.0 / gradient_accumulation_steps),
@@ -166,20 +171,41 @@ def main():
 
             accumulated_loss += loss.item()
 
-        loss = mx.array(accumulated_loss / gradient_accumulation_steps) # scale the loss to account for gradient accumulation
+        # scale the loss to account for gradient accumulation
+        loss = mx.array(accumulated_loss / gradient_accumulation_steps) 
 
-        tic = print_loss(optimizer, iter_num, loss.item(), tic)
-        # immediately async prefetch next batch while model is doing the forward pass on the GPU
-        X, Y = get_batch('train')
+        optimizer.update(model, accumulated_grads)
 
-        mx.simplify(loss, model.parameters())
-        mx.eval(loss, model.parameters())
-        model.update(
-            optimizer.apply_gradients(accumulated_grads, model)
-        )
         accumulated_grads = tree_map(
             lambda x: mx.zeros_like(x), model.parameters()
         )
+        return loss
+
+    # fetch the first batch of samples.
+    X, Y = get_batch('train')
+    
+    state = [model.state, optimizer.state]
+
+    tic = time.perf_counter()
+    local_iter_num = 0 # number of iterations in the lifetime of this process
+    iter_num = 0
+    
+    while True:
+        if iter_num == 0 and eval_only:
+            break
+
+        # lr schedule
+        new_lr = update_learning_rate(iter_num)
+        optimizer.set_learning_rate(new_lr)
+
+        # mx.simplify(loss, model.parameters())
+        loss = step(X, Y, gradient_accumulation_steps)
+        # immediately async prefetch next batch while model is doing the forward pass on the GPU
+        X, Y = get_batch('train')
+
+        tic = print_loss(optimizer, iter_num, loss.item(), tic)
+
+        mx.eval(state)
 
         if iter_num % log_interval == 0:
             log_train_dict = {
@@ -187,6 +213,15 @@ def main():
                 'lr': new_lr
             }
             log_tboard_dict(log_train_dict, iter_num, 'train')
+        
+        if iter_num % save_interval == 0:
+            # save mode weights
+            flat_params = tree_flatten(model.parameters())
+            mx.savez(save_model_path, **dict(flat_params))
+            # save model config
+            with open(save_model_config_path, "w") as f:
+                json.dump(model.config.__dict__, f)
+
         iter_num += 1
         local_iter_num += 1
 

@@ -1,6 +1,7 @@
 # train a miniature character-level shakespeare model
 # good for debugging and playing on macbooks and such
 out_dir = 'gpt2_shakespeare_pretrain'
+save_name = 'gpt2_small_shakespeare'
 dataset = 'shakespeare'
 gradient_accumulation_steps = 16
 batch_size = 4
@@ -22,6 +23,7 @@ n_embd = 384
 dropout = 0.2
 
 # eval stuff
+save_interval = 1000
 eval_interval = 250 # keep frequent because we'll overfit
 eval_iters = 200
 log_interval = 10 # don't print too too often

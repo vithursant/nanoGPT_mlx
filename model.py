@@ -5,6 +5,7 @@ import mlx.nn as nn
 
 from dataclasses import dataclass
 
+import pdb
 
 class LayerNorm(nn.Module):
     r"""Applies layer normalization [1] on the inputs.
@@ -245,21 +246,56 @@ class GPT(nn.Module):
         y = mx.random.categorical(y * (1 / temperature))
         return y
 
-    def generate(self, x: mx.array, max_new_tokens=256, temperature=0.8):
-        _, t = x.shape
-        pos = mx.arange(0, t, 1, dtype=x.dtype)
-        mask = CausalSelfAttention.create_additive_causal_mask(t)
-        x, cache = self._forward_transformer(x, pos, mask=mask, build_cache=True)
-        y = self._sample_next_token(x, temperature)
-        position = t
-        yield y
-
+    def generate(self, idx: mx.array, max_new_tokens=256, temperature=1.0, top_k=None):
+        """
+        Take a conditioning sequence of indices idx (LongTensor of shape (b,t)) and complete
+        the sequence max_new_tokens times, feeding the predictions back into the model each time.
+        Most likely you'll want to make sure to be in model.eval() mode of operation for this.
+        """
+        # Initialize the initial sequence context (idx)
+        idx = mx.zeros((1, 1), dtype=mx.int64)
+        
         for _ in range(max_new_tokens):
-            position += 1
-            x = y[:, None]
-            x, cache = self._forward_transformer(x, position, cache=cache)
-            y = self._sample_next_token(x, temperature)
-            yield y
+            # if the sequence context is growing too long we must crop it at block_size
+            # idx_cond = idx if idx[0].shape[1] <= self.config.block_size else idx[:, -self.config.block_size:]
+            idx_cond = idx if idx.shape[1] <= self.config.block_size else idx[:, -self.config.block_size:]
+
+            # forward the model to get the logits for the index in the sequence
+            logits = self(idx_cond)
+
+            # pluck the logits at the final step and scale by desired temperature
+            logits = logits[:, -1, :] / temperature
+
+            # optionally crop the logits to only the top k options
+            if top_k is not None:
+                v, _ = custom_topk(logits, min(top_k, logits.shape[-1]))
+
+                v_shape = v.shape
+
+                # Compute the index of the last element along the second dimension of v
+                last_index = v_shape[1] - 1
+
+                # Use MLX.take to extract the last element along the second dimension of v
+                last_element = mx.take(v, mx.array([last_index]))
+
+                # Expand the last element to match the shape of logits for broadcasting
+                v_last_expanded = mx.expand_dims(last_element, axis=1)
+
+                # Replace values with -1e9 where mask is True
+                mask = logits < v_last_expanded
+                inf_tensor = mx.ones_like(logits) * float('-1e9')
+                logits = (mask * logits) + ((1 - mask) * inf_tensor)
+
+            # apply softmax to convert logits to (normalized) probabilities
+            probs = mx.softmax(logits)
+
+            # Sample from the distribution
+            idx_next = mx.random.categorical(probs, 1)
+
+            # Append sampled index to the running sequence
+            idx = mx.concatenate([idx, mx.expand_dims(idx_next, axis=0)], axis=1)
+
+        return idx
 
     def _forward_transformer(
         self, x: mx.array, pos: mx.array, mask=None, cache=None, build_cache=False
@@ -291,12 +327,39 @@ class GPT(nn.Module):
 
         x, _ = self._forward_transformer(x, pos, mask=mask)
         return self.out_proj(x)
-
-    def loss(self, x, y):
-        logits = self(x)
-        loss = nn.losses.cross_entropy(
-            logits.reshape(-1, logits.shape[-1]), y.reshape(-1)
-        )
-        mx.simplify(loss)
-        return mx.mean(loss)
         
+
+def custom_topk(input, k):
+    """
+    Custom implementation of top-k function in MLX.
+    :param input: The input tensor.
+    :param k: The number of elements to keep.
+    :return: A tuple containing the top-k values and their indices.
+    """
+    # Flatten the input tensor along the last dimension
+    flat_input = mx.reshape(input, (-1,))
+
+    # Sort the flattened input tensor in descending order
+    sorted_indices = mx.argsort(flat_input)
+    sorted_indices = mx.take(sorted_indices, mx.arange(sorted_indices.size - 1, -1, -1))
+
+    # Slice the sorted indices to get the top-k indices
+    topk_indices = custom_slice(sorted_indices, start=0, end=k)
+    
+    # Gather the top-k values using the top-k indices
+    topk_values = mx.take(flat_input, topk_indices)
+    
+    return mx.expand_dims(topk_values, axis=0), mx.expand_dims(topk_indices,  axis=0)
+
+
+def custom_slice(indices, start, end):
+    """
+    Custom implementation of slice operation for indices.
+    :param indices: The sorted indices tensor.
+    :param start: The starting index for slicing.
+    :param end: The ending index for slicing.
+    :return: The sliced indices tensor.
+    """
+    # Take the range of indices from start to end
+    sliced_indices = mx.take(indices, mx.arange(start, end))
+    return sliced_indices
