@@ -60,12 +60,12 @@ python train.py configs/train_gpt2_owt.py
 ```
 
 ## todos
-- disable weight decay on non-decay params in optimizer
-- add bfloat16 training support
-- integrate Eleuther Eval
-- add checkpoint conversion for loading pre-trained models
-- enable finetuning models from pre-trained checkpoints
-- enable inference with pre-trained models
+- [ ] disable weight decay on non-decay params in optimizer
+- [ ] add bfloat16 training support
+- [ ] integrate Eleuther Eval
+- [x] add checkpoint conversion for loading pre-trained models 
+- [ ] enable finetuning models from pre-trained checkpoints
+- [x] enable inference with pre-trained models
 
 ## acknowledgements
 Thank you [Andrej Karpthy](https://github.com/karpathy) for creating the nanoGPT codebase. It's been awesome for quick prototyping!
